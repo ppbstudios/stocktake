@@ -10,28 +10,34 @@
         box-sizing: border-box;
       }
       body {
-        font-family: sans-serif;
+        font-family: 'Noto Sans KR', sans-serif;
         margin: 0;
         display: flex;
         flex-direction: column;
         height: 100vh;
+        background-color: #fafafa;
+        color: #333;
       }
       .top-bar {
-        background: #f5f5f5;
+        background: #ffffff;
         padding: 1rem;
         position: sticky;
         top: 0;
         z-index: 10;
-        border-bottom: 1px solid #ccc;
+        border-bottom: 1px solid #ddd;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
       }
       .top-bar input[type='text'] {
         width: 100%;
-        padding: 0.5rem;
+        padding: 0.75rem;
         font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 8px;
       }
       .top-bar .info {
         margin-top: 0.5rem;
         font-size: 0.95rem;
+        font-weight: 500;
       }
       .top-bar .actions {
         margin-top: 0.5rem;
@@ -45,37 +51,51 @@
         overflow-y: auto;
         padding: 1rem;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
+      .product-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1rem;
+        padding: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.3s ease;
       }
-      th,
-      td {
-        border: 1px solid #ccc;
-        padding: 0.25rem;
-        text-align: left;
+      .product-card.highlight {
+        background: #e6f7ff;
       }
-      td input[type='number'] {
-        width: 50px;
+      .product-info {
+        flex: 1;
+        font-size: 0.9rem;
+        line-height: 1.4;
       }
-      .qty-buttons {
-        display: inline-block;
-        margin-left: 4px;
+      .product-controls {
+        display: flex;
+        align-items: center;
       }
-      .qty-buttons button {
-        padding: 2px 6px;
+      .product-controls input {
+        width: 48px;
+        margin-right: 0.5rem;
+        padding: 4px 6px;
+      }
+      .product-controls button {
+        padding: 6px 8px;
+        margin: 0 2px;
         font-size: 0.9rem;
       }
       button {
         padding: 6px 12px;
         font-size: 1rem;
+        border-radius: 6px;
+        border: none;
+        background: #333;
+        color: #fff;
+        cursor: pointer;
       }
-      @media (max-width: 600px) {
-        .top-bar .actions {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 0.5rem;
-        }
+      #totalCount {
+        font-weight: 600;
+        font-size: 1rem;
       }
     </style>
   </head>
@@ -94,26 +114,14 @@
       </div>
     </div>
 
-    <div class="main">
-      <table id="inventoryTable">
-        <thead>
-          <tr>
-            <th>바코드</th>
-            <th>SKU</th>
-            <th>브랜드</th>
-            <th>제품명</th>
-            <th>수량</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <div class="main" id="productList"></div>
 
     <script>
       const csvUrl =
         'https://cdn.winc.app/uploads/ppb/file/file/20051/product_list_0722-4612d1.csv';
       let productData = {};
       let inventory = [];
+      let latestIndex = -1;
 
       Papa.parse(csvUrl, {
         download: true,
@@ -125,11 +133,6 @@
             const code = String(row['barcode'] || '').trim();
             if (code.length > 2) productData[code] = row;
           });
-          console.log(
-            '[DEBUG] Loaded:',
-            Object.keys(productData).length,
-            'items'
-          );
         },
       });
 
@@ -140,14 +143,9 @@
             '<span style="color:red;">등록되지 않은 바코드입니다.</span>';
           return;
         }
-        info.innerHTML = `<strong>${product.brand || ''} / </strong>${product.product_name || ''}`;}
-      //   info.innerHTML = `
-      //   <strong>${product.brand || ''}</strong><br />
-      //   ${product.product_name || ''} / ${product.color || ''} / ${
-      //     product.power || ''
-      //   }
-      // `;
-      
+        info.innerHTML = `<strong>${product.brand || ''}</strong><br />
+        ${product.product_name || ''} `;
+      }
 
       function updateTotalCount() {
         const total = inventory.reduce((sum, item) => sum + item.quantity, 0);
@@ -172,31 +170,33 @@
           product_name: product.product_name || '',
           quantity: 1,
         });
-        renderInventoryTable();
+        latestIndex = inventory.length - 1;
+        renderInventoryList();
         displayProductInfo(product);
         updateTotalCount();
         setTimeout(scrollToBottom, 100);
       }
 
-      function renderInventoryTable() {
-        const tbody = document.querySelector('#inventoryTable tbody');
-        tbody.innerHTML = '';
+      function renderInventoryList() {
+        const list = document.getElementById('productList');
+        list.innerHTML = '';
         inventory.forEach((item, idx) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-          <td>${item.barcode}</td>
-          <td>${item.sku}</td>
-          <td>${item.brand}</td>
-          <td>${item.product_name}</td>
-          <td>
-            <input type="number" value="${item.quantity}" onchange="updateQuantity(${idx}, this.value)" />
-            <span class="qty-buttons">
+          const card = document.createElement('div');
+          card.className =
+            'product-card' + (idx === latestIndex ? ' highlight' : '');
+          card.innerHTML = `
+            <div class="product-info">
+              <strong>${item.brand}</strong><br />
+              ${item.product_name}<br />
+              <small>바코드: ${item.barcode} / SKU: ${item.sku}</small>
+            </div>
+            <div class="product-controls">
+              <input type="number" value="${item.quantity}" onchange="updateQuantity(${idx}, this.value)" />
               <button onclick="changeQty(${idx}, 1)">+</button>
               <button onclick="changeQty(${idx}, -1)">−</button>
-            </span>
-          </td>
-        `;
-          tbody.appendChild(row);
+            </div>
+          `;
+          list.appendChild(card);
         });
       }
 
@@ -210,7 +210,7 @@
           1,
           inventory[index].quantity + delta
         );
-        renderInventoryTable();
+        renderInventoryList();
         updateTotalCount();
       }
 
