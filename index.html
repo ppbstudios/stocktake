@@ -187,7 +187,13 @@
           });
         },
       });
-
+      
+      document.addEventListener('touchend', function (e) {
+        const now = new Date().getTime();
+        if (now - (window._lastTouchEnd || 0) < 300) e.preventDefault();
+        window._lastTouchEnd = now;
+      }, false);
+      
       function addToInventory(barcode) {
         const product = productData[barcode];
         if (!product) return alert('등록되지 않은 바코드입니다.');
