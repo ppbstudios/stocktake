@@ -7,7 +7,6 @@
       content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
     <title>재고조사 웹앱</title>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <style>
       * {
         box-sizing: border-box;
@@ -169,50 +168,43 @@
     <div id="toast"></div>
 
     <script>
-      const csvUrl =
-        'https://cdn.winc.app/uploads/ppb/file/file/24237/product_list_1002_raw-9dbd49.csv';
-      let productData = {};
+      const apiEndpoint = 'https://partnerhub.prd.external.theppbs.com/stocktake';
       let inventory = [];
       let latestIndex = -1;
 
-      Papa.parse(csvUrl, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        transformHeader: (header) => header.trim().toLowerCase(),
-        complete: function (results) {
-          results.data.forEach((row) => {
-            const code = String(row['barcode'] || '').trim();
-            if (code.length > 2) productData[code] = row;
-          });
-        },
-      });
-      
       document.addEventListener('touchend', function (e) {
         const now = new Date().getTime();
         if (now - (window._lastTouchEnd || 0) < 300) e.preventDefault();
         window._lastTouchEnd = now;
       }, false);
-      
-      function addToInventory(barcode) {
-        const product = productData[barcode];
-        if (!product) return alert('등록되지 않은 바코드입니다.');
-        inventory.push({
-          barcode,
-          sku: product.sku || '',
-          brand: product.brand || '',
-          product_name: product.product_name || '',
-          quantity: 1,
-        });
-        latestIndex = inventory.length - 1;
-        renderInventoryList();
-        updateTotalCount();
-        setTimeout(
-          () =>
-            (document.querySelector('.main').scrollTop =
-              document.querySelector('.main').scrollHeight),
-          100
-        );
+
+      async function addToInventory(barcode) {
+        try {
+          const response = await fetch(`${apiEndpoint}/${barcode}`);
+          if (!response.ok) {
+            return alert('등록되지 않은 바코드입니다.');
+          }
+          const product = await response.json();
+          inventory.push({
+            barcode,
+            sku: product.sku || '',
+            brand: product.brand || '',
+            product_name: product.product_name || '',
+            quantity: 1,
+          });
+          latestIndex = inventory.length - 1;
+          renderInventoryList();
+          updateTotalCount();
+          setTimeout(
+            () =>
+              (document.querySelector('.main').scrollTop =
+                document.querySelector('.main').scrollHeight),
+            100
+          );
+        } catch (error) {
+          console.error('API 호출 오류:', error);
+          alert('상품 정보를 가져오는데 실패했습니다.');
+        }
       }
 
       function deleteItem(index) {
